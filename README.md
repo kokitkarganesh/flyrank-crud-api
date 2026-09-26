@@ -1,49 +1,117 @@
-# Task API — FlyRank Week 2 Assignment A1
+# Task API — FlyRank Week 3 Assignment A2
 
-A small **FastAPI CRUD API** that manages a to-do list using an in-memory Python list. It implements the six required stages from the FlyRank Backend Track Week 2 assignment.
+A small FastAPI CRUD API upgraded from in-memory storage to a persistent SQLite database.
 
-> **Important:** No database or files are used for task storage. Restarting the server resets the data to the three example tasks, as required by the assignment.
+This project continues the Week 2 CRUD API. The API endpoints and response behavior remain the same; only the storage layer has changed from a Python list to `tasks.db`.
 
-## Requirements
+## Assignment goal
+
+Week 3 requires the same CRUD API to store tasks in SQLite so data survives server restarts.
+
+### API architecture
+
+```text
+Client
+  |
+  v
+FastAPI CRUD API
+  |
+  v
+SQLite (tasks.db)
+```
+
+## Tech stack
 
 - Python 3.10+
-- pip
+- FastAPI
+- Uvicorn
+- SQLite (`sqlite3`, included with Python)
+- Pytest + HTTPX
+- DB Browser for SQLite
 
-## Install and run
+No separate database server is required.
 
-Create and activate a virtual environment, then install dependencies:
+## Why SQLite?
 
-```bash
-python -m venv .venv
+SQLite was chosen because it:
+
+- stores the complete database in one file;
+- requires zero database-server setup;
+- is included with Python through `sqlite3`;
+- keeps the project simple for a small CRUD API;
+- provides persistence, so data survives application restarts.
+
+## Database
+
+The database file is:
+
+```text
+tasks.db
 ```
+
+It is created automatically when the application starts.
+
+The `tasks` table is also created automatically:
+
+| Column | Type | Purpose |
+|---|---|---|
+| `id` | INTEGER | Primary key, automatically assigned |
+| `title` | TEXT | Task title |
+| `done` | INTEGER | Boolean value stored as 0 or 1 |
+
+The database is intentionally git-ignored. A fresh clone creates its own `tasks.db` automatically.
+
+## Seed data
+
+On first startup, the application inserts exactly three example tasks, but only when the table is empty:
+
+1. Learn FastAPI
+2. Build CRUD API
+3. Test with Swagger
+
+Restarting the server does not duplicate these rows.
+
+## Installation
+
+### 1. Create a virtual environment
 
 Windows PowerShell:
 
 ```powershell
-.venv\Scripts\Activate.ps1
+python -m venv .venv
+```
+
+### 2. Activate it
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+### 3. Install dependencies
+
+```powershell
 pip install -r requirements.txt
+```
+
+## Start the API
+
+```powershell
 uvicorn main:app --reload
 ```
 
-macOS/Linux:
+The API runs at:
 
-```bash
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --reload
+```text
+http://localhost:8000
 ```
 
-The API runs at `http://localhost:8000`.
+Swagger UI:
 
-## Swagger UI
+```text
+http://localhost:8000/docs
+```
 
-Open:
-
-`http://localhost:8000/docs`
-
-FastAPI generates the interactive Swagger UI automatically. Use **Try it out** to run the complete CRUD cycle.
-
-## Endpoints
+## CRUD endpoints
 
 | Method | Endpoint | Purpose | Success | Errors |
 |---|---|---|---|---|
@@ -55,116 +123,223 @@ FastAPI generates the interactive Swagger UI automatically. Use **Try it out** t
 | PUT | `/tasks/{id}` | Update task | 200 | 400, 404 |
 | DELETE | `/tasks/{id}` | Delete task | 204 | 404 |
 
-## Example curl commands
+The same endpoint behavior from Assignment 1 is preserved.
+
+## Parameterized SQL
+
+All user-supplied values are passed separately through `?` placeholders.
+
+Examples:
+
+```sql
+SELECT * FROM tasks WHERE id = ?;
+```
+
+```sql
+INSERT INTO tasks (title, done) VALUES (?, ?);
+```
+
+```sql
+UPDATE tasks SET title = ?, done = ? WHERE id = ?;
+```
+
+```sql
+DELETE FROM tasks WHERE id = ?;
+```
+
+This avoids building SQL strings by concatenating user input.
+
+## Example API checks
 
 ### Read all tasks
 
-```bash
-curl -i http://localhost:8000/tasks
-```
-
-Expected status:
-
-```text
-HTTP/1.1 200 OK
+```powershell
+curl.exe -i http://localhost:8000/tasks
 ```
 
 ### Read one task
 
-```bash
-curl -i http://localhost:8000/tasks/1
+```powershell
+curl.exe -i http://localhost:8000/tasks/1
 ```
 
-### Read an unknown task
+### Unknown task
 
-```bash
-curl -i http://localhost:8000/tasks/99
+```powershell
+curl.exe -i http://localhost:8000/tasks/999
 ```
 
-Expected JSON error:
+Expected status: `404`.
 
-```json
-{"detail":"Task 99 not found"}
+### Create
+
+```powershell
+curl.exe -i -X POST http://localhost:8000/tasks -H "Content-Type: application/json" -d "{\"title\":\"Buy milk\"}"
 ```
 
-### Create a task
+Expected status: `201`.
 
-```bash
-curl -i -X POST http://localhost:8000/tasks -H "Content-Type: application/json" -d '{"title":"Buy milk"}'
+### Update
+
+```powershell
+curl.exe -i -X PUT http://localhost:8000/tasks/1 -H "Content-Type: application/json" -d "{\"done\":true}"
 ```
 
-Expected status: `201 Created`.
+Expected status: `200`.
 
-### Update a task
+### Delete
 
-```bash
-curl -i -X PUT http://localhost:8000/tasks/1 -H "Content-Type: application/json" -d '{"done":true}'
+```powershell
+curl.exe -i -X DELETE http://localhost:8000/tasks/1
 ```
 
-Expected status: `200 OK`.
+Expected status: `204`.
 
-### Delete a task
+## Testing
 
-```bash
-curl -i -X DELETE http://localhost:8000/tasks/1
-```
+Run the automated tests:
 
-Expected status: `204 No Content`.
-
-## Validation
-
-- POST with a missing title returns `400` with a JSON error.
-- POST with an empty/whitespace-only title returns `400`.
-- POST creates a task with the next free numeric ID and `done: false`.
-- PUT must contain at least `title` or `done`.
-- PUT with an empty/whitespace-only title returns `400`.
-- Unknown task IDs return `404`.
-
-## Automated tests
-
-Run:
-
-```bash
+```powershell
 pytest -q
 ```
 
-The tests cover the root and health endpoints, read operations, 404 handling, create validation, update, and delete.
+The tests cover:
 
-## In-memory data experiment
+- root and health endpoints;
+- SQLite schema;
+- three-task seed behavior;
+- database reads;
+- 404 handling;
+- create validation;
+- database inserts;
+- updates;
+- deletes;
+- persistence in SQLite.
 
-The task list is stored only in Python memory. If tasks are created or updated and the server is restarted, those changes disappear and the three seed tasks return. This is intentional: the assignment asks for in-memory storage, and Week 3 introduces the database persistence problem.
+## Stage 4 — SQL explored by hand
 
-## AI vs me — Stage 7 bonus
+Open `tasks.db` with DB Browser for SQLite and use the **Execute SQL** tab.
 
-### My prompt
+Example query:
 
-> Build a Python 3.10+ FastAPI application for a beginner backend assignment. Create an in-memory to-do task API with three initial tasks. Each task must have a numeric id, string title, and boolean done field. Implement GET `/`, GET `/health`, GET `/tasks`, GET `/tasks/{id}`, POST `/tasks`, PUT `/tasks/{id}`, and DELETE `/tasks/{id}`. GET reads should return 200, missing task IDs should return 404 with a JSON error message, POST should create the next numeric ID, set done to false, and return 201, POST should reject missing or empty titles, PUT should update title and/or done and reject an empty body, and DELETE should return 204 with no body. Keep all data in memory and do not add a database or file storage. Add useful endpoint descriptions so FastAPI's Swagger UI at `/docs` documents the API. Keep the implementation simple enough for a beginner to understand.
+```sql
+SELECT * FROM tasks;
+```
 
-### AI version
+This returns every task stored in the database.
 
-A separate generated version is stored in `ai-version/main.py` so the hand-built `main.py` remains untouched.
+Other useful assignment queries:
 
-### Three differences to review
+```sql
+SELECT * FROM tasks WHERE done = 1;
+```
 
-1. **Validation behavior:** FastAPI/Pydantic handles a missing `title` at the schema level, producing a framework-level `422` response, while an explicitly empty title is handled by our application and returns `400`.
-2. **Update model:** The hand-built version uses a separate update model so `title` and `done` can each be updated independently, while an AI implementation may choose a different model or make fields required.
-3. **ID generation:** The hand-built version calculates the next free ID from the current in-memory list instead of maintaining a separate counter, so deleting a task does not require synchronizing another variable.
+```sql
+SELECT COUNT(*) FROM tasks;
+```
 
-### What the prompt could have specified better
+After changing data in DB Browser, call:
 
-The prompt could explicitly require the exact JSON error shape from the assignment (`{"error":"..."}` rather than FastAPI's default `{"detail":"..."}`) and could specify whether missing JSON fields should be `400` or framework validation errors. This project converts FastAPI request-validation failures into the assignment-required `400` JSON error response.
+```text
+GET /tasks
+```
 
-### Rematch change
+The API reads the same SQLite file, so the change is visible without restarting the server.
 
-For a second generation, the prompt should explicitly define the required error response shape and validation status codes to reduce ambiguity.
+## DB Browser screenshot
+
+For the final submission, open `tasks.db` in DB Browser for SQLite and capture a screenshot showing:
+
+- the `tasks` table;
+- the columns `id`, `title`, and `done`;
+- the three seed rows or your current task rows.
+
+Save the screenshot in the repository, for example:
+
+```text
+docs/db-browser-screenshot.png
+```
+
+Then add it to this README:
+
+```markdown
+## Database screenshot
+
+![SQLite tasks table](docs/db-browser-screenshot.png)
+```
+
+## Persistence proof
+
+A simple persistence check:
+
+1. Start the API.
+2. Create a task.
+3. Stop the API.
+4. Start the API again.
+5. Run `GET /tasks`.
+6. Confirm the created task is still present.
+
+This proves the data is stored in SQLite rather than only in application memory.
+
+## Git history
+
+The assignment asks for one commit per stage.
+
+Recommended commit sequence:
+
+```text
+Stage 0: create SQLite database
+Stage 1: database read endpoints
+Stage 2: insert into database
+Stage 3: update and delete with SQL
+Stage 4: explored SQLite
+Stage 5: database documentation
+```
+
+The repository already contains the Week 2 history; these six additional commits document the Week 3 migration.
+
+## Clean-clone behavior
+
+A stranger should be able to:
+
+```powershell
+git clone <YOUR-REPOSITORY-URL>
+cd flyrank-crud-api
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
+
+The application automatically creates `tasks.db`, creates the `tasks` table, and seeds the three example tasks.
 
 ## Assignment checklist
 
-- [x] Stage 0 — Hello server
-- [x] Stage 1 — Root and health endpoints
-- [x] Stage 2 — Read endpoints + 404
-- [x] Stage 3 — Create + validation
-- [x] Stage 4 — Update + delete
-- [x] Stage 5 — Swagger UI
-- [x] Stage 6 — README and Git history prepared
-- [x] Stage 7 — AI rematch section + isolated AI version
+- [x] Same CRUD endpoints as Assignment 1
+- [x] SQLite database storage
+- [x] `tasks.db` created automatically
+- [x] `tasks` table created automatically
+- [x] Three tasks seeded only when the table is empty
+- [x] Data survives restarts
+- [x] Parameterized SQL queries
+- [x] 200 / 201 / 204 success codes
+- [x] 400 validation errors
+- [x] 404 unknown-task errors
+- [x] README documents SQLite choice
+- [x] README documents run command
+- [x] README includes an example SQL query
+- [ ] Add DB Browser screenshot after opening the database locally
+- [ ] Complete the six Week 3 stage commits
+- [ ] Push final changes to public GitHub
+
+## Project structure
+
+```text
+flyrank-crud-api/
+├── ai-version/
+├── .gitignore
+├── README.md
+├── main.py
+├── requirements.txt
+└── test_main.py
+```
