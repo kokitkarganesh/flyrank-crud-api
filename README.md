@@ -113,7 +113,7 @@ Expected status: `204 No Content`.
 
 ## Validation
 
-- POST with a missing title is rejected.
+- POST with a missing title returns `400` with a JSON error.
 - POST with an empty/whitespace-only title returns `400`.
 - POST creates a task with the next free numeric ID and `done: false`.
 - PUT must contain at least `title` or `done`.
@@ -152,7 +152,7 @@ A separate generated version is stored in `ai-version/main.py` so the hand-built
 
 ### What the prompt could have specified better
 
-The prompt could explicitly require the exact JSON error shape from the assignment (`{"error":"..."}` rather than FastAPI's default `{"detail":"..."}`) and could specify whether missing JSON fields should be `400` or framework validation errors. This project keeps FastAPI's normal validation response for a structurally missing `title`, while application-level empty-title validation returns `400`.
+The prompt could explicitly require the exact JSON error shape from the assignment (`{"error":"..."}` rather than FastAPI's default `{"detail":"..."}`) and could specify whether missing JSON fields should be `400` or framework validation errors. This project converts FastAPI request-validation failures into the assignment-required `400` JSON error response.
 
 ### Rematch change
 

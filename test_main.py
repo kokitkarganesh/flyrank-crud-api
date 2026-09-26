@@ -27,7 +27,7 @@ def test_read_tasks_and_404():
     assert client.get("/tasks/1").json()["title"] == "Learn FastAPI"
     response = client.get("/tasks/99")
     assert response.status_code == 404
-    assert "Task 99 not found" in response.json()["detail"]
+    assert response.json() == {"error": "Task 99 not found"}
 
 
 def test_create_validation_and_success():
@@ -36,7 +36,7 @@ def test_create_validation_and_success():
     assert response.json() == {"id": 4, "title": "Buy milk", "done": False}
 
     invalid = client.post("/tasks", json={})
-    assert invalid.status_code == 422
+    assert invalid.status_code == 400
 
     empty = client.post("/tasks", json={"title": "   "})
     assert empty.status_code == 400
