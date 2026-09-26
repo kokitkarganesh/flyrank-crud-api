@@ -72,3 +72,6 @@ def delete_task(task_id: int):
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
     tasks.pop(index)
     return None
+
+# FastAPI automatically exposes interactive Swagger UI at /docs.
+# Endpoint summaries are kept in the route decorators above so the docs are readable.
