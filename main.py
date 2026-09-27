@@ -3,7 +3,14 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from repository import get_all_tasks, get_task_by_id, init_database
+from repository import (
+    create_task,
+    delete_task as delete_task_from_db,
+    get_all_tasks,
+    get_task_by_id,
+    init_database,
+    update_task as update_task_in_db,
+)
 
 
 app = FastAPI(
@@ -42,11 +49,10 @@ class TaskUpdate(BaseModel):
     done: bool | None = None
 
 
-# Create the PostgreSQL table and seed the initial 3 tasks.
 init_database()
 
 
-@app.get("/", summary="API information")
+@app.get("/")
 def root():
     return {
         "name": "Task API",
@@ -55,51 +61,71 @@ def root():
     }
 
 
-@app.get("/health", summary="Health check")
+@app.get("/health")
 def health():
     return {"status": "ok"}
 
 
-@app.get("/tasks", summary="List all tasks")
+@app.get("/tasks")
 def list_tasks():
     return get_all_tasks()
 
 
-@app.get("/tasks/{task_id}", summary="Get one task")
+@app.get("/tasks/{task_id}")
 def get_task(task_id: int):
     task = get_task_by_id(task_id)
 
     if task is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Task not found",
-        )
+        raise HTTPException(404, "Task not found")
 
     return task
 
 
-@app.post("/tasks", status_code=201, summary="Create a task")
-def create_task(task: TaskCreate):
-    # CRUD write operations will be added in Stage 3.
-    raise HTTPException(
-        status_code=501,
-        detail="Create task will be implemented in Stage 3",
-    )
+@app.post("/tasks", status_code=201)
+def create_new_task(task: TaskCreate):
+    title = task.title.strip()
+
+    if not title:
+        raise HTTPException(400, "Title must not be empty")
+
+    done = task.done if task.done is not None else False
+
+    return create_task(title, done)
 
 
-@app.put("/tasks/{task_id}", summary="Update a task")
-def update_task(task_id: int, task: TaskUpdate):
-    # CRUD write operations will be added in Stage 3.
-    raise HTTPException(
-        status_code=501,
-        detail="Update task will be implemented in Stage 3",
-    )
+@app.put("/tasks/{task_id}")
+def update_existing_task(task_id: int, task: TaskUpdate):
+    if task.title is None and task.done is None:
+        raise HTTPException(
+            400,
+            "Request body must include title or done",
+        )
+
+    existing = get_task_by_id(task_id)
+
+    if existing is None:
+        raise HTTPException(404, "Task not found")
+
+    title = existing["title"]
+    done = existing["done"]
+
+    if task.title is not None:
+        title = task.title.strip()
+
+        if not title:
+            raise HTTPException(400, "Title must not be empty")
+
+    if task.done is not None:
+        done = task.done
+
+    return update_task_in_db(task_id, title, done)
 
 
-@app.delete("/tasks/{task_id}", status_code=204, summary="Delete a task")
-def delete_task(task_id: int):
-    # CRUD write operations will be added in Stage 3.
-    raise HTTPException(
-        status_code=501,
-        detail="Delete task will be implemented in Stage 3",
-    )
+@app.delete("/tasks/{task_id}", status_code=204)
+def delete_existing_task(task_id: int):
+    deleted = delete_task_from_db(task_id)
+
+    if not deleted:
+        raise HTTPException(404, "Task not found")
+
+    return None

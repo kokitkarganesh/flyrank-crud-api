@@ -4,7 +4,6 @@ import time
 import psycopg
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -35,9 +34,8 @@ def init_database():
                     )
 
                     cur.execute("SELECT COUNT(*) FROM tasks")
-                    count = cur.fetchone()[0]
 
-                    if count == 0:
+                    if cur.fetchone()[0] == 0:
                         cur.executemany(
                             "INSERT INTO tasks (title, done) VALUES (%s, %s)",
                             [
@@ -48,16 +46,13 @@ def init_database():
                         )
 
                 conn.commit()
-
             return
 
         except psycopg.OperationalError as error:
             last_error = error
             time.sleep(2)
 
-    raise RuntimeError(
-        f"Could not connect to PostgreSQL: {last_error}"
-    )
+    raise RuntimeError(f"Could not connect to PostgreSQL: {last_error}")
 
 
 def get_all_tasks():
@@ -69,11 +64,7 @@ def get_all_tasks():
             rows = cursor.fetchall()
 
     return [
-        {
-            "id": row[0],
-            "title": row[1],
-            "done": row[2],
-        }
+        {"id": row[0], "title": row[1], "done": row[2]}
         for row in rows
     ]
 
@@ -90,8 +81,52 @@ def get_task_by_id(task_id: int):
     if row is None:
         return None
 
-    return {
-        "id": row[0],
-        "title": row[1],
-        "done": row[2],
-    }
+    return {"id": row[0], "title": row[1], "done": row[2]}
+
+
+def create_task(title: str, done: bool):
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO tasks (title, done)
+                VALUES (%s, %s)
+                RETURNING id, title, done
+                """,
+                (title, done),
+            )
+            row = cursor.fetchone()
+
+    return {"id": row[0], "title": row[1], "done": row[2]}
+
+
+def update_task(task_id: int, title: str, done: bool):
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE tasks
+                SET title = %s, done = %s
+                WHERE id = %s
+                RETURNING id, title, done
+                """,
+                (title, done, task_id),
+            )
+            row = cursor.fetchone()
+
+    if row is None:
+        return None
+
+    return {"id": row[0], "title": row[1], "done": row[2]}
+
+
+def delete_task(task_id: int):
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM tasks WHERE id = %s",
+                (task_id,),
+            )
+            deleted = cursor.rowcount
+
+    return deleted > 0
